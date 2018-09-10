@@ -338,10 +338,6 @@ if __name__ == "__main__":
     omega_m = ic.x_freqs  # normal mode frequencies
     b_ij = ic.x_eigvecs  # normal mode eigenvectors
     
-    print ("Helloccc")
-    print(ic.n)
-    ic.plot_equilibrium_position()
-    ic.plot_frequencies()
 
     # incorrect assumption about the equilibrium configuration can lead
     # to errors
