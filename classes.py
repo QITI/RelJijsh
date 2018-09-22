@@ -3,7 +3,7 @@ import matplotlib.colors as colors
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
-import mystic as mys
+#import mystic as mys
 import numpy as np
 import scipy.optimize as opt
 
