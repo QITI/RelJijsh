@@ -38,6 +38,20 @@ class QuadraticCost(object):
         """Return the error delta from the output layer."""
         return (a-y) * sigmoid_prime(z)
 
+class QuadraticCostModified(object):
+
+    @staticmethod
+    def fn(a, y):
+        """Return the cost associated with an output ``a`` and desired output
+        ``y``.
+
+        """
+        return 0.25*np.linalg.norm(2*a-1-y)**2
+
+    @staticmethod
+    def delta(z, a, y):
+        """Return the error delta from the output layer."""
+        return (2*a-1-y) * sigmoid_prime(z)
 
 class CrossEntropyCost(object):
 
@@ -67,7 +81,7 @@ class CrossEntropyCost(object):
 #### Main Network class
 class Network(object):
 
-    def __init__(self, sizes, cost=QuadraticCost):
+    def __init__(self, sizes, cost=QuadraticCostModified):
         """The list ``sizes`` contains the number of neurons in the respective
         layers of the network.  For example, if the list was [2, 3, 1]
         then it would be a three-layer network, with the first layer
@@ -127,7 +141,7 @@ class Network(object):
         return a
 
     def SGD(self, training_data, epochs, mini_batch_size, eta,
-            lmbda = 0.0,evaluation_data=None,eta_update=0):
+            lmbda = 0.0,evaluation_data=None,eta_update=False):
         """Train the neural network using mini-batch stochastic gradient
         descent.  The ``training_data`` is a list of tuples ``(x, y)``
         representing the training inputs and the desired outputs.  The
@@ -150,6 +164,7 @@ class Network(object):
         validation cost has plateaued
 
         """
+        eta_0 = eta
         if evaluation_data: n_data = len(evaluation_data)
         n = len(training_data)
         evaluation_cost = []
@@ -169,9 +184,8 @@ class Network(object):
             cost = self.total_cost_no_reg(evaluation_data)
             evaluation_cost.append(cost)
             print ("Cost on evaluation data: {}".format(cost))
-            if eta_update and j > eta_update:
-              if abs(evaluation_cost[-eta_update]-evaluation_cost[-1])<0.1:
-                eta /= 10
+            if eta_update:
+              eta = eta_0/(2+j)
             print
           #plot figure comparing validation and training set cost
         plt.figure(figsize =(epochs/10,5))
