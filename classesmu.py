@@ -1,5 +1,11 @@
 """Summary
 """
+from misc import diag_idcs
+import matplotlib.colors as colors
+import matplotlib.cm as cm
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+import mystic as mys
 import numpy as np
 import scipy.optimize as opt
 import torch
@@ -212,6 +218,84 @@ class IonChain(object):
         self.mean_delta_w_z = mean_delta_w_z
         pass
 
+    def plot_equil_pos(self, **kwargs):
+        """Plots the equilibrium position of the ions
+
+        Keyword Args:
+            fig (matplotlib.figure.Figure): Figure for plot (default = plt.figure())
+            idx (int): 3 digit integer representing position of the subplot
+                (default = 111)
+
+        Returns:
+            matplotlib.axes._subplots.AxesSubplot: Axes of the plot
+        """
+        plot_params = {
+            "fig": plt.figure() if "fig" not in kwargs.keys() else None,
+            "idx": 111,
+        }
+        plot_params.update(kwargs)
+
+        r = self.equil_pos / self.len_scale
+
+        ax = plot_params["fig"].add_subplot(plot_params["idx"])
+        ax.plot(r[1], r[0], "o", color="r")
+        ax.set_xlabel(r"$\frac{z}{l}$")
+        ax.set_ylabel(r"$\frac{x}{l}$")
+        ax.set_xlim(1.1 * r.min(), 1.1 * r.max())
+        ax.set_ylim(1.1 * r.min(), 1.1 * r.max())
+        ax.set_aspect("equal")
+        ax.grid(True, "major", ls="-")
+        ax.minorticks_on()
+        ax.grid(True, "minor", ls="--")
+        return ax
+        pass
+
+    def plot_modes(self, **kwargs):
+        """Plots the normal mode frequencies of the ions
+
+        Keyword Args:
+            fig (matplotlib.figure.Figure): Figure for plot (default = plt.figure())
+            idx (int): 3 digit integer representing position of the subplot
+                (default = 111)
+
+        Returns:
+            matplotlib.axes._subplots.AxesSubplot: Axes of the plot
+        """
+        plot_params = {
+            "fig": plt.figure() if "fig" not in kwargs.keys() else None,
+            "idx": 111,
+        }
+        plot_params.update(kwargs)
+
+        rel_w_x = self.w_x / self.omega[1]
+        rel_w_z = self.w_z / self.omega[1]
+
+        ax = plot_params["fig"].add_subplot(plot_params["idx"])
+
+        y = np.linspace(0, 1, 2)
+
+        x = self.beta * np.ones(2)
+        ax.plot(x, y, "-", color="r", label=r"$\omega_x$")
+
+        x = np.ones(2)
+        ax.plot(x, y, "-", color="b", label=r"$\omega_z$")
+
+        x = np.hstack([w * np.ones(21) for w in rel_w_x])
+        y = np.hstack([np.linspace(0, 1, 21) for w in rel_w_x])
+        ax.plot(x, y, "x", color="r", label=r"$\omega^{(x)}_m$")
+
+        x = np.hstack([w * np.ones(21) for w in rel_w_z])
+        y = np.hstack([np.linspace(0, 1, 21) for w in rel_w_z])
+        ax.plot(x, y, "o", color="b", label=r"$\omega^{(z)}_m$")
+
+        ax.set_xlabel(r"frequency in units of $\omega_z$")
+        ax.set_ylim(0, 1)
+        ax.set_yticks([])
+        ax.grid(True, "major", ls="-")
+        ax.minorticks_on()
+        ax.grid(True, "minor", ls="--")
+        return ax
+
     pass
 
 
@@ -347,6 +431,81 @@ class SpinLattice(object):
         """
         return self / self.norm(norm)
 
+    # def diag_rms(self):
+    #     J = self.J
+    #     idcs_dict = {i: np.array(diag_idcs(self.n, i)) for i in range(1, self.n)}
+    #     diag_rms = np.zeros(self.n - 1)
+    #     for i in range(1, self.n):
+    #         diag_tensor = torch.zeros(J.shape, dtype=torch.float64, device=self.dev)
+    #         diag_tensor[:, idcs_dict[i][0], idcs_dict[i][1]] = 1
+    #         diag_rms[:, i - 1] = torch.einsum(
+    #             "nij,nij->n", (torch.abs(J), diag_tensor)
+    #         )
+    #     self.diag_rms = diag_rms
+    #     pass
+
+    def plot_interaction_graph(self, **kwargs):
+        """Plots the normal mode frequencies of the ions
+
+        Keyword Args:
+            fig (matplotlib.figure.Figure): Figure for plot (default = plt.figure())
+            idx (int): 3 digit integer representing position of the subplot
+                (default = 111)
+            plot_type(str): Type of plot (default = "bar3d")
+
+        Returns:
+            matplotlib.axes._subplots.Axes3DSubplot or
+            matplotlib.axes._subplots.AxesSubplot: Axes of the plot
+        """
+        plot3d_params = {
+            "fig": plt.figure() if "fig" not in kwargs.keys() else None,
+            "idx": 111,
+            "plot_type": "bar3d",
+        }
+        plot3d_params.update(kwargs)
+
+        n = self.n
+        Z = self.J
+
+        if plot3d_params["plot_type"] == "bar3d":
+            ax = plot3d_params["fig"].add_subplot(plot3d_params["idx"], projection="3d")
+
+            Z = np.transpose(Z)
+
+            X, Y = np.meshgrid(np.linspace(0, n - 1, n), np.linspace(0, n - 1, n))
+
+            X = X.flatten()
+            Y = Y.flatten()
+            Z = Z.flatten()
+
+            W = Z - Z.min()
+            frac = W / W.max()
+            norm = colors.Normalize(frac.min(), frac.max())
+            color = cm.gist_rainbow(norm(frac))
+
+            ax.bar3d(X, Y, np.zeros(len(Z)), 1, 1, Z, color=color)
+            ax.set_xlabel(r"$i$")
+            ax.set_ylabel(r"$j$")
+            ax.set_zlabel(r"$J$")
+            ax.set_xticks(np.linspace(0.5, n - 0.5, n))
+            ax.set_xticklabels(range(n))
+            ax.set_yticks(np.linspace(0.5, n - 0.5, n))
+            ax.set_yticklabels(range(n))
+            ax.set_xlim(0, n)
+            ax.set_ylim(0, n)
+            ax.set_zlim(min(0, 1.1 * Z.min()), 1.1 * Z.max())
+        elif plot3d_params["plot_type"] == "imshow":
+            ax = plot3d_params["fig"].add_subplot(plot3d_params["idx"])
+            ax.imshow(Z, cmap=cm.gist_rainbow)
+            ax.set_xlabel(r"$j$")
+            ax.set_ylabel(r"$i$")
+
+        cax = plt.cm.ScalarMappable(cmap=cm.gist_rainbow)
+        cax.set_array(Z)
+        cbar = plot3d_params["fig"].colorbar(cax, ax=ax)
+        cbar.set_label(r"$J$")
+        return ax
+
     pass
 
 
@@ -410,6 +569,120 @@ class SimulatedSpinLattice(SpinLattice):
         super().__init__(J)
         pass
 
+    def plot_detunings(self, **kwargs):
+        """Plots the detunings used in SimulatedSpinLattice
+
+        Keyword Args:
+            fig (matplotlib.figure.Figure): Figure for plot (default = plt.figure())
+            idx (int): 3 digit integer representing position of the subplot
+                (default = 111)
+
+        Returns:
+            matplotlib.axes._subplots.AxesSubplot: Axes of the plot
+        """
+        plot_params = {
+            "fig": plt.figure() if "fig" not in kwargs.keys() else None,
+            "idx": 111,
+        }
+        plot_params.update(kwargs)
+
+        if self.dir == "x":
+            w = self.ic.w_x
+        elif self.dir == "z":
+            w = self.ic.w_z
+
+        rel_w = w / self.ic.omega[1]
+        rel_mu = self.mu / self.ic.omega[1]
+
+        ax = plot_params["fig"].add_subplot(plot_params["idx"])
+
+        y = np.linspace(0, 1, 2)
+
+        for i in range(len(rel_w)):
+            x = rel_w[i] * np.ones(2)
+            if i == 0:
+                ax.plot(x, y, "-", color="b", label=r"$\omega_m$")
+            else:
+                ax.plot(x, y, "-", color="b")
+
+        for freq in rel_mu:
+            x = freq * np.ones(2)
+            ax.plot(x, y, "--", color="r")
+
+        ax.set_xlabel(r"frequency in units of $\omega_z$")
+        ax.set_ylim(0, 1)
+        ax.set_yticks([])
+        ax.grid(True, "major", ls="-")
+        ax.minorticks_on()
+        ax.grid(True, "minor", ls="--")
+        ax.legend()
+        return ax
+
+    def plot_Rabi_freqs(self, **kwargs):
+        """Plots the Rabi frequencies used in SimulatedSpinLattice
+
+        Keyword Args:
+            fig (matplotlib.figure.Figure): Figure for plot (default = plt.figure())
+            idx (int): 3 digit integer representing position of the subplot
+                (default = 111)
+            plot_type(str): Type of plot (default = "bar3d")
+
+        Returns:
+            matplotlib.axes._subplots.Axes3DSubplot or
+            matplotlib.axes._subplots.AxesSubplot: Axes of the plot
+        """
+        plot3d_params = {
+            "fig": plt.figure() if "fig" not in kwargs.keys() else None,
+            "idx": 111,
+            "plot_type": "bar3d",
+        }
+        plot3d_params.update(kwargs)
+
+        i, n = self.Omega.shape
+        Z = self.Omega
+
+        if plot3d_params["plot_type"] == "bar3d":
+            ax = plot3d_params["fig"].add_subplot(plot3d_params["idx"], projection="3d")
+
+            Z = np.transpose(Z)
+
+            X, Y = np.meshgrid(np.linspace(0, i - 1, i), np.linspace(0, n - 1, n))
+
+            X = X.flatten()
+            Y = Y.flatten()
+            Z = Z.flatten()
+
+            W = Z - Z.min()
+            if (W == 0).all():
+                frac = W
+            else:
+                frac = W / W.max()
+            norm = colors.Normalize(frac.min(), frac.max())
+            color = cm.gist_rainbow(norm(frac))
+
+            ax.bar3d(X, Y, np.zeros(len(Z)), 1, 1, Z, color=color)
+            ax.set_xlabel(r"$i$")
+            ax.set_ylabel(r"$n$")
+            ax.set_zlabel(r"$\Omega$")
+            ax.set_xticks(np.linspace(0.5, i - 0.5, i))
+            ax.set_xticklabels(range(i))
+            ax.set_yticks(np.linspace(0.5, n - 0.5, n))
+            ax.set_yticklabels(range(n))
+            ax.set_xlim(0, i)
+            ax.set_ylim(0, n)
+            ax.set_zlim(min(0, 1.1 * Z.min()), 1.1 * Z.max())
+        elif plot3d_params["plot_type"] == "imshow":
+            ax = plot3d_params["fig"].add_subplot(plot3d_params["idx"])
+            ax.imshow(Z, cmap=cm.gist_rainbow)
+            ax.set_xlabel(r"$n$")
+            ax.set_ylabel(r"$i$")
+
+        cax = plt.cm.ScalarMappable(cmap=cm.gist_rainbow)
+        cax.set_array(Z)
+        cbar = plot3d_params["fig"].colorbar(cax, ax=ax)
+        cbar.set_label(r"$\Omega$")
+        return ax
+
     pass
 
 
@@ -453,9 +726,9 @@ class BatchSimulatedSpinLattice(object):
         hbar = 1.0546e-34
 
         self.__dict__.update(bssl_params)
-
         self.bssl_params = bssl_params
         self.ic = ic
+        self.N = len(mu)
         self.mu = torch.tensor(mu).to(dtype=torch.float64, device=self.dev)
         self.n = ic.n
         self.Omega = torch.tensor(Omega).to(dtype=torch.float64, device=self.dev)
@@ -474,7 +747,9 @@ class BatchSimulatedSpinLattice(object):
             "in,n->in", (b, 2 * self.k * torch.sqrt(hbar / (2 * ic.mass * w)))
         )
         zeta = torch.einsum("pim,in->pimn", (self.Omega, eta))
-        chi = torch.tensor(1 - np.identity(ic.n)).to(dtype=torch.float64, device=self.dev)
+        chi = torch.tensor(1 - np.identity(ic.n)).to(
+            dtype=torch.float64, device=self.dev
+        )
 
         J = torch.einsum(
             "ij,pimn,pjmn,n,mn->pij",
@@ -503,7 +778,6 @@ class BatchSimulatedSpinLattice(object):
         """
         return self.N
 
-
     def norm(self, norm="L2"):
         """Calculates the norm of the vectorized interaction graphs
 
@@ -518,7 +792,7 @@ class BatchSimulatedSpinLattice(object):
         if norm in norms.keys():
             norm = norms[norm]
         self.norm = norm(self.v)
-        pass
+        return self.norm
 
     def normalize(self, norm="L2"):
         """Normalizes all the interaction graphs in BatchSimulatedSpinLattice
@@ -531,15 +805,36 @@ class BatchSimulatedSpinLattice(object):
         self.nv = torch.einsum("ni,n->ni", (self.v, 1 / self.norm))
         return self.nv
 
-    def datafy(self):
+    def rms(self):
+        self.rms = torch.sqrt((self.v ** 2).mean(1))
+        pass
+
+    def diag_rms(self):
+        J = self.J
+        idcs_dict = {i: np.array(diag_idcs(self.n, i)) for i in range(1, self.n)}
+        diag_rms = torch.zeros((self.N, self.n - 1))
+        for i in range(1, self.n):
+            diag_tensor = torch.zeros(J.shape, dtype=torch.float64, device=self.dev)
+            diag_tensor[:, idcs_dict[i][0], idcs_dict[i][1]] = 1
+            diag_rms[:, i - 1] = torch.sqrt(
+                torch.einsum("nij,nij,nij->n", (J, J, diag_tensor)) / (self.n - i)
+            )
+        self.nd = torch.einsum(
+            "ni,n->ni", (diag_rms, 1 / torch.sqrt((diag_rms ** 2).sum(1)))
+        )
+        pass
+
+    def datafy(self, *args):
         """Converts BatchSimulatedSpinLattice into a dictionary of data
 
         Returns:
             dict: Dictionary containing data of BatchSimulatedSpinLattice
         """
+        keys = ["J", "mu", "nd", "nJ", "norm", "nv", "Omega", "rms", "v"]
+        keys.append(args)
 
-        bssl_data_dict = {"J": self.J, "mu": self.mu, "Omega": self.Omega, "v": self.v}
-        for key in ["nJ", "norm", "nv"]:
+        bssl_data_dict = {}
+        for key in keys:
             if key in self.__dict__.keys():
                 bssl_data_dict[key] = self.__dict__[key]
         return bssl_data_dict
